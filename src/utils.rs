@@ -105,6 +105,78 @@ fn resolve_url_simple(url: &str, base_url: &str) -> String {
     }
 }
 
+/// Escape markdown special characters in text.
+///
+/// Uses position-aware escaping to avoid over-escaping characters that only
+/// create markdown constructs in specific positions. Always escapes the core
+/// set (`\`, `` ` ``, `*`, `_`, `[`, `]`, `<`) and only escapes positional
+/// characters (`#`, `>`, `-`, `+`, `.`, `!`) where they could create headings,
+/// blockquotes, lists, or image syntax.
+pub(crate) fn escape_markdown_text(text: &str) -> String {
+    let mut result = String::with_capacity(text.len() + text.len() / 10);
+    let bytes = text.as_bytes();
+    let len = bytes.len();
+    let mut at_line_start = true;
+    // Tracks whether we've seen only digits (and whitespace) since line start.
+    // Used to detect ordered list markers like "1. " or "10. ".
+    let mut only_digits_on_line = false;
+
+    for (i, c) in text.char_indices() {
+        match c {
+            '\n' => {
+                result.push('\n');
+                at_line_start = true;
+                only_digits_on_line = false;
+                continue;
+            }
+            // Always escape: core markdown chars
+            '\\' | '`' | '*' | '_' | '[' | ']' | '<' => {
+                result.push('\\');
+                result.push(c);
+            }
+            // Heading marker: only at line start
+            '#' if at_line_start => {
+                result.push('\\');
+                result.push(c);
+            }
+            // Blockquote marker: only at line start
+            '>' if at_line_start => {
+                result.push('\\');
+                result.push(c);
+            }
+            // Unordered list markers: only at line start followed by space
+            '-' | '+' if at_line_start && i + 1 < len && bytes[i + 1] == b' ' => {
+                result.push('\\');
+                result.push(c);
+            }
+            // Digits at line start: track for ordered list detection
+            '0'..='9' if at_line_start || only_digits_on_line => {
+                only_digits_on_line = true;
+                at_line_start = false;
+                result.push(c);
+                continue;
+            }
+            // Ordered list marker: digits then ". " at line start
+            '.' if only_digits_on_line && i + 1 < len && bytes[i + 1] == b' ' => {
+                result.push('\\');
+                result.push(c);
+            }
+            // Image syntax: ! immediately before [
+            '!' if i + 1 < len && bytes[i + 1] == b'[' => {
+                result.push('\\');
+                result.push(c);
+            }
+            _ => result.push(c),
+        }
+        if c != ' ' && c != '\t' {
+            at_line_start = false;
+            only_digits_on_line = false;
+        }
+    }
+
+    result
+}
+
 /// Escape special characters in URLs for markdown.
 /// Escapes parentheses which would break markdown link syntax.
 pub(crate) fn escape_url(url: &str) -> String {

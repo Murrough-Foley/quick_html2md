@@ -4,7 +4,7 @@ use dom_query::Selection;
 
 use crate::elements::{blocks, code, headings, inline, lists, tables};
 use crate::options::MarkdownOptions;
-use crate::utils::get_tag_name;
+use crate::utils::{escape_markdown_text, get_tag_name};
 
 /// Convert a DOM node to markdown.
 ///
@@ -105,6 +105,7 @@ pub(crate) fn convert_node(
 
 /// Recursively process children of an element.
 /// Handles both text nodes and element nodes.
+/// Skips whitespace-only text nodes to prevent empty div inflation.
 fn recurse_children(
     sel: &Selection,
     output: &mut String,
@@ -115,6 +116,13 @@ fn recurse_children(
         for child in node.children() {
             if child.is_text() {
                 let text = child.text();
+                if text.trim().is_empty() {
+                    // Whitespace-only text node: emit at most a single space separator
+                    if !output.ends_with(' ') && !output.ends_with('\n') {
+                        output.push(' ');
+                    }
+                    continue;
+                }
                 if options.escape_special_chars {
                     output.push_str(&escape_markdown_text(&text));
                 } else {
@@ -126,22 +134,4 @@ fn recurse_children(
             }
         }
     }
-}
-
-/// Escape markdown special characters in text.
-fn escape_markdown_text(text: &str) -> String {
-    let mut result = String::with_capacity(text.len() + text.len() / 10);
-
-    for c in text.chars() {
-        match c {
-            '\\' | '`' | '*' | '_' | '{' | '}' | '[' | ']' | '(' | ')' | '#' | '+' | '-' | '.'
-            | '!' | '<' | '>' | '~' => {
-                result.push('\\');
-                result.push(c);
-            }
-            _ => result.push(c),
-        }
-    }
-
-    result
 }

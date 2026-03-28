@@ -578,6 +578,116 @@ mod tests {
         assert!(md.contains(r"\[brackets\]"));
     }
 
+    #[test]
+    fn test_escape_positional_chars_not_at_line_start() {
+        let options = MarkdownOptions::new().escape_special_chars(true);
+        // # > - + should NOT be escaped mid-line
+        let html = "<p>Price is $10.99 and 5+3=8 and C++ rocks</p>";
+        let md = html_to_markdown_with_options(html, &options);
+        assert!(md.contains("$10.99"), "period should not be escaped mid-line");
+        assert!(md.contains("5+3=8"), "plus should not be escaped mid-line");
+        assert!(md.contains("C++"), "plus should not be escaped mid-line");
+    }
+
+    #[test]
+    fn test_escape_no_unnecessary_braces() {
+        let options = MarkdownOptions::new().escape_special_chars(true);
+        let html = "<p>fn() { return x; }</p>";
+        let md = html_to_markdown_with_options(html, &options);
+        assert!(
+            md.contains("{ return x; }"),
+            "braces should not be escaped: {md}"
+        );
+    }
+
+    #[test]
+    fn test_escape_heading_at_line_start() {
+        let options = MarkdownOptions::new().escape_special_chars(true);
+        // Text that starts with # should be escaped (it's at paragraph start = line start)
+        let html = "<p># not a heading</p>";
+        let md = html_to_markdown_with_options(html, &options);
+        assert!(md.contains(r"\#"), "# at line start should be escaped");
+    }
+
+    #[test]
+    fn test_escape_blockquote_at_line_start() {
+        let options = MarkdownOptions::new().escape_special_chars(true);
+        let html = "<p>> not a blockquote</p>";
+        let md = html_to_markdown_with_options(html, &options);
+        assert!(
+            md.contains(r"\>"),
+            "> at line start should be escaped: {md}"
+        );
+    }
+
+    #[test]
+    fn test_escape_list_marker_at_line_start() {
+        let options = MarkdownOptions::new().escape_special_chars(true);
+        let html = "<p>- not a list item</p>";
+        let md = html_to_markdown_with_options(html, &options);
+        assert!(
+            md.contains(r"\-"),
+            "- at line start + space should be escaped: {md}"
+        );
+    }
+
+    #[test]
+    fn test_escape_ordered_list_at_line_start() {
+        let options = MarkdownOptions::new().escape_special_chars(true);
+        let html = "<p>1. not an ordered list</p>";
+        let md = html_to_markdown_with_options(html, &options);
+        assert!(
+            md.contains(r"1\."),
+            "1. at line start should be escaped: {md}"
+        );
+    }
+
+    #[test]
+    fn test_escape_image_syntax() {
+        let options = MarkdownOptions::new().escape_special_chars(true);
+        let html = "<p>Use ![alt](url) for images</p>";
+        let md = html_to_markdown_with_options(html, &options);
+        assert!(
+            md.contains(r"\!"),
+            "! before [ should be escaped: {md}"
+        );
+    }
+
+    #[test]
+    fn test_escape_backtick_in_text() {
+        let options = MarkdownOptions::new().escape_special_chars(true);
+        let html = "<p>Use `code` backticks</p>";
+        let md = html_to_markdown_with_options(html, &options);
+        assert!(
+            md.contains(r"\`"),
+            "backticks should be escaped: {md}"
+        );
+    }
+
+    #[test]
+    fn test_escape_angle_bracket() {
+        let options = MarkdownOptions::new().escape_special_chars(true);
+        let html = "<p>a &lt; b and c &gt; d</p>";
+        let md = html_to_markdown_with_options(html, &options);
+        assert!(md.contains(r"\<"), "< should be escaped: {md}");
+        // > mid-line should NOT be escaped (only at line start)
+        assert!(
+            !md.contains(r"\>") || md.starts_with(r"\>"),
+            "> mid-line should not be escaped: {md}"
+        );
+    }
+
+    #[test]
+    fn test_escape_dash_midline_not_escaped() {
+        let options = MarkdownOptions::new().escape_special_chars(true);
+        let html = "<p>well-known and state-of-the-art</p>";
+        let md = html_to_markdown_with_options(html, &options);
+        assert!(
+            md.contains("well-known"),
+            "hyphens mid-line should not be escaped: {md}"
+        );
+    }
+
     // ==================== Image Dimension Handling Tests ====================
 
     #[test]
@@ -598,6 +708,85 @@ mod tests {
         let md = html_to_markdown_with_options(html, &options);
         // Without dimensions, use standard markdown
         assert!(md.contains("![Photo](photo.jpg)"));
+    }
+
+    // ==================== Empty Div Inflation Tests ====================
+
+    #[test]
+    fn test_nested_empty_divs() {
+        let html = "<div><div><div><p>Content</p></div></div></div>";
+        let md = html_to_markdown(html);
+        assert_eq!(md, "Content\n");
+    }
+
+    #[test]
+    fn test_whitespace_only_divs() {
+        let html = "<div>   \n\t  </div><p>Real content</p>";
+        let md = html_to_markdown(html);
+        assert_eq!(md, "Real content\n");
+    }
+
+    #[test]
+    fn test_deeply_nested_divs_no_inflation() {
+        let html = format!(
+            "{}<p>Content</p>{}",
+            "<div>".repeat(100),
+            "</div>".repeat(100)
+        );
+        let md = html_to_markdown(&html);
+        assert_eq!(md.trim(), "Content");
+        assert!(md.len() < 50, "Output inflated: {} bytes", md.len());
+    }
+
+    #[test]
+    fn test_div_with_mixed_content() {
+        let html = "<div>Hello <strong>world</strong></div>";
+        let md = html_to_markdown(html);
+        assert!(md.contains("Hello"));
+        assert!(md.contains("**world**"));
+    }
+
+    #[test]
+    fn test_inline_spacing_preserved() {
+        // Whitespace between inline elements must be preserved as a space
+        let html = "<p><span>Hello</span> <span>World</span></p>";
+        let md = html_to_markdown(html);
+        assert!(
+            md.contains("Hello World"),
+            "Space between inline elements must be preserved: {md}"
+        );
+    }
+
+    #[test]
+    fn test_sibling_divs_with_content() {
+        // Adjacent content divs should have their content separated
+        let html = "<div><p>First</p></div><div><p>Second</p></div>";
+        let md = html_to_markdown(html);
+        assert!(md.contains("First"), "First content present: {md}");
+        assert!(md.contains("Second"), "Second content present: {md}");
+    }
+
+    #[test]
+    fn test_structural_elements_no_inflation() {
+        let html = r#"
+            <header>
+                <nav>
+                    <div></div>
+                </nav>
+            </header>
+            <main>
+                <article>
+                    <section>
+                        <p>Article content</p>
+                    </section>
+                </article>
+            </main>
+            <footer>
+                <div></div>
+            </footer>
+        "#;
+        let md = html_to_markdown(html);
+        assert_eq!(md.trim(), "Article content");
     }
 
     #[test]

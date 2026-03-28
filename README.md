@@ -15,7 +15,7 @@ Fast HTML to Markdown conversion with GitHub Flavored Markdown (GFM) support.
 - **Blockquotes**: `<blockquote>` -> `> quote`
 - **URL Resolution**: Resolve relative URLs against a base URL
 - **CommonMark Mode**: Strict CommonMark compliance option
-- **Character Escaping**: Optional escaping of markdown special characters
+- **Smart Escaping**: Position-aware escaping of markdown special characters
 
 ## Quick Start
 
@@ -117,13 +117,41 @@ let md = html_to_markdown_with_options(html, &options);
 // Output: <img src="photo.jpg" alt="Photo" width="200" height="100" />
 ```
 
+## Smart Character Escaping
+
+When `escape_special_chars(true)` is enabled, the converter uses position-aware
+escaping that only escapes characters where they would create markdown constructs:
+
+- Core characters (`\`, `` ` ``, `*`, `_`, `[`, `]`, `<`) are always escaped
+- Positional characters (`#`, `>`, `-`, `+`, `.`, `!`) are only escaped where
+  they could create headings, blockquotes, lists, or image syntax
+- Characters like `{`, `}`, `(`, `)`, `~` are **not** escaped since they don't
+  create markdown constructs in standard/GFM markdown
+
+```rust
+use quick_html2md::{html_to_markdown_with_options, MarkdownOptions};
+
+let options = MarkdownOptions::new().escape_special_chars(true);
+
+let html = "<p>Price is $10.99 and fn() { return x; }</p>";
+let md = html_to_markdown_with_options(html, &options);
+// Braces, parens, and periods are NOT escaped
+// Output: Price is $10.99 and fn() { return x; }
+```
+
+## Efficient Structural HTML Handling
+
+Empty or whitespace-only structural elements (`<div>`, `<section>`, `<nav>`, etc.)
+are collapsed rather than producing inflated output. This prevents the 3-40x size
+inflation that can occur on complex pages with deep `<div>` nesting.
+
 ## Optional Features
 
 - `url` - Enable the `url` crate for more robust URL resolution
 
 ```toml
 [dependencies]
-quick_html2md = { version = "0.1", features = ["url"] }
+quick_html2md = { version = "0.2", features = ["url"] }
 ```
 
 ## Migration from html-cleaning
