@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.1 (2026-03-28)
+
+### Fixed
+
+- **Period escaping inside headings**: `escape_markdown_text()` now accepts an
+  `at_line_start` parameter. Positional escaping (ordered list `1.`, heading `#`,
+  blockquote `>`, list markers `-`/`+`) is only applied when text is at the true
+  start of a line in the output buffer, not inside headings, emphasis, or other
+  block elements. This fixes `### 1\. Section` → `### 1. Section`.
+
 ## 0.2.0 (2026-03-28)
 
 ### Fixed

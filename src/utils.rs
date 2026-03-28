@@ -112,11 +112,15 @@ fn resolve_url_simple(url: &str, base_url: &str) -> String {
 /// set (`\`, `` ` ``, `*`, `_`, `[`, `]`, `<`) and only escapes positional
 /// characters (`#`, `>`, `-`, `+`, `.`, `!`) where they could create headings,
 /// blockquotes, lists, or image syntax.
-pub(crate) fn escape_markdown_text(text: &str) -> String {
+/// The `at_line_start` parameter indicates whether this text appears at the
+/// true start of a line in the output (not inside a heading, blockquote, etc.).
+/// When `false`, positional escaping (`#`, `>`, `-`, `+`, ordered list `.`) is
+/// skipped since the line already has a markdown prefix that prevents ambiguity.
+pub(crate) fn escape_markdown_text(text: &str, at_line_start: bool) -> String {
     let mut result = String::with_capacity(text.len() + text.len() / 10);
     let bytes = text.as_bytes();
     let len = bytes.len();
-    let mut at_line_start = true;
+    let mut at_line_start = at_line_start;
     // Tracks whether we've seen only digits (and whitespace) since line start.
     // Used to detect ordered list markers like "1. " or "10. ".
     let mut only_digits_on_line = false;

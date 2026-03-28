@@ -601,6 +601,29 @@ mod tests {
     }
 
     #[test]
+    fn test_numbered_heading_no_escape() {
+        let html = "<h3>1. First section</h3>";
+        let md = html_to_markdown(html);
+        assert_eq!(md, "### 1. First section\n");
+    }
+
+    #[test]
+    fn test_numbered_heading_with_subheadings() {
+        let html = "<h2>Section 1. Introduction</h2><h3>1.1. Background</h3>";
+        let md = html_to_markdown(html);
+        assert!(md.contains("## Section 1. Introduction"), "got: {md}");
+        assert!(md.contains("### 1.1. Background"), "got: {md}");
+    }
+
+    #[test]
+    fn test_numbered_list_still_escaped_in_text() {
+        let options = MarkdownOptions::new().escape_special_chars(true);
+        let html = "<p>1. This could be a list</p>";
+        let md = html_to_markdown_with_options(html, &options);
+        assert!(md.contains("1\\."), "1. in plain text should be escaped: {md}");
+    }
+
+    #[test]
     fn test_escape_heading_at_line_start() {
         let options = MarkdownOptions::new().escape_special_chars(true);
         // Text that starts with # should be escaped (it's at paragraph start = line start)

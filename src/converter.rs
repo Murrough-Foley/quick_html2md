@@ -124,7 +124,9 @@ fn recurse_children(
                     continue;
                 }
                 if options.escape_special_chars {
-                    output.push_str(&escape_markdown_text(&text));
+                    let line_start = output.is_empty()
+                        || output.ends_with('\n');
+                    output.push_str(&escape_markdown_text(&text, line_start));
                 } else {
                     output.push_str(&text);
                 }

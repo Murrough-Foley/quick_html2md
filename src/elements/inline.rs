@@ -30,7 +30,12 @@ pub(crate) fn convert_inline_content_impl(
             if child.is_text() {
                 let text = child.text();
                 if options.escape_special_chars {
-                    output.push_str(&escape_markdown_text(&text));
+                    // Check if we're at true line start in the output buffer.
+                    // Inside headings (### ), blockquotes (> ), etc., the line
+                    // already has a prefix so positional escaping is unnecessary.
+                    let line_start = output.is_empty()
+                        || output.ends_with('\n');
+                    output.push_str(&escape_markdown_text(&text, line_start));
                 } else {
                     output.push_str(&text);
                 }
@@ -281,8 +286,8 @@ mod tests {
 
     #[test]
     fn test_escape_markdown_text() {
-        assert_eq!(escape_markdown_text("hello"), "hello");
-        assert_eq!(escape_markdown_text("*bold*"), r"\*bold\*");
-        assert_eq!(escape_markdown_text("[link]"), r"\[link\]");
+        assert_eq!(escape_markdown_text("hello", true), "hello");
+        assert_eq!(escape_markdown_text("*bold*", true), r"\*bold\*");
+        assert_eq!(escape_markdown_text("[link]", true), r"\[link\]");
     }
 }
